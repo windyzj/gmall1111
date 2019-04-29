@@ -12,6 +12,7 @@
         <module>gmall1111-common</module>
         <module>gmall1111-mock</module>
         <module>gmall1111-logger</module>
+        <module>gmall1111-realtime</module>
     </modules>
     <parent>
         <groupId>org.springframework.boot</groupId>
