@@ -1,12 +1,14 @@
 package com.atguigu.gmall1111.publisher.service.impl;
 
 import com.atguigu.gmall1111.common.constant.GmallConstant;
+import com.atguigu.gmall1111.publisher.bean.SaleInfo;
 import com.atguigu.gmall1111.publisher.service.PublisherService;
 import io.searchbox.client.JestClient;
 import io.searchbox.core.Search;
 import io.searchbox.core.SearchResult;
 import io.searchbox.core.search.aggregation.TermsAggregation;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,5 +157,54 @@ public class PublisherServiceImpl implements PublisherService {
             e.printStackTrace();
         }
         return totalAmountHourMap;
+    }
+
+    @Override
+    public SaleInfo getSaleInfo(String date, String keyword, int startPage, int pagesize, String aggsFieldName, int aggsize) {
+
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+
+        BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
+        //过滤：日期
+        boolQueryBuilder.filter(new TermQueryBuilder("dt",date));
+        //匹配： 商品关键词
+        boolQueryBuilder.must(new MatchQueryBuilder("sku_name",keyword).operator(MatchQueryBuilder.Operator.AND));
+        searchSourceBuilder.query(boolQueryBuilder);
+         //聚合
+        TermsBuilder termAggs = AggregationBuilders.terms("groupby_" + aggsFieldName).field(aggsFieldName).size(aggsize);
+        searchSourceBuilder.aggregation(termAggs);
+        //分页
+        searchSourceBuilder.from((startPage-1)*pagesize);
+        searchSourceBuilder.size(pagesize);
+
+        Search search = new Search.Builder(searchSourceBuilder.toString()).addIndex(GmallConstant.ES_INDEX_SALE).addType(GmallConstant.ES_TYPE_DEFAULT).build();
+
+
+        SaleInfo saleInfo = new SaleInfo();
+         List<Map> detailList = new ArrayList();
+        try {
+            SearchResult searchResult = jestClient.execute(search);
+            //总数
+            saleInfo.setTotal(searchResult.getTotal());
+            //明细
+            List<SearchResult.Hit<Map, Void>> hits = searchResult.getHits(Map.class);
+            for (SearchResult.Hit<Map, Void> hit : hits) {
+                Map source = hit.source;
+                detailList.add(source);
+            }
+            saleInfo.setDetail(detailList);
+            //饼图（聚合结果）
+            Map aggsTempMap=new HashMap();
+            List<TermsAggregation.Entry> buckets = searchResult.getAggregations().getTermsAggregation("groupby_" + aggsFieldName).getBuckets();
+            for (TermsAggregation.Entry bucket : buckets) {
+                aggsTempMap.put(bucket.getKey(),bucket.getCount());
+            }
+            saleInfo.setTempAggsMap(aggsTempMap);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return saleInfo;
     }
 }
