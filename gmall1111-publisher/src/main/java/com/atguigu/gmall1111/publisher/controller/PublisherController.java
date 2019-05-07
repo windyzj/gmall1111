@@ -38,10 +38,23 @@ public class PublisherController {
         newMidMap.put("value",233);
         totalList.add(newMidMap);
 
+        HashMap<String, Object> orderAmountMap = new HashMap<>();
+        orderAmountMap.put("id","order_amount");
+        orderAmountMap.put("name","新增交易额");
+        Double orderTotalAmount = publisherService.getOrderTotalAmount(date);
+        orderAmountMap.put("value",orderTotalAmount);
+        totalList.add(orderAmountMap);
+
 
         return   JSON.toJSONString(totalList) ;
     }
 
+    /**
+     * 分时数据
+     * @param id
+     * @param today
+     * @return
+     */
     @GetMapping("realtime-hour")
     public String getRealtimeHour(@RequestParam("id") String id ,@RequestParam("date") String today){
         String hourJson=null;
@@ -57,8 +70,17 @@ public class PublisherController {
             realtimeHourMap.put("today",dauHourTdMap);
             hourJson=JSON.toJSONString(realtimeHourMap);
 
-        }else {
-            //xxxx
+        }else if("order_amount".equals(id)){
+            //查询今日分时
+            Map orderAmountHourTdMap = publisherService.getOrderTotalAmountHour(today);
+            //查询昨日分时
+            String yesterday = getYesterday(today);
+            Map orderAmountHourYdMap = publisherService.getOrderTotalAmountHour(yesterday);
+
+            HashMap<String, Map> realtimeHourMap = new HashMap<>();
+            realtimeHourMap.put("yesterday",orderAmountHourYdMap);
+            realtimeHourMap.put("today",orderAmountHourTdMap);
+            hourJson=JSON.toJSONString(realtimeHourMap);
         }
        return hourJson;
     }
